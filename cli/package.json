@@ -1,0 +1,15 @@
+{
+  "name": "drillable-check",
+  "version": "0.1.0",
+  "description": "Catch hallucinated, squatted, unpublished, or vulnerable dependencies — grades the packages in your lockfiles against the live registry + OSV.",
+  "type": "module",
+  "bin": { "drillable-check": "bin/drillable-check.mjs" },
+  "files": ["bin", "README.md"],
+  "engines": { "node": ">=18" },
+  "keywords": ["dependencies", "supply-chain", "slopsquatting", "typosquatting", "audit", "ci", "security", "drillable"],
+  "homepage": "https://drillable.com",
+  "repository": { "type": "git", "url": "git+https://github.com/drillablehq/drillable-check.git", "directory": "cli" },
+  "bugs": { "url": "https://github.com/drillablehq/drillable-check/issues" },
+  "author": "Drillable",
+  "license": "UNLICENSED"
+}

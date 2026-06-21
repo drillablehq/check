@@ -1,0 +1,18 @@
+# Copy into a CONSUMING repo at .github/workflows/drillable-check.yml
+# Checks each PR's changed lockfiles for hallucinated / squatted / unpublished / vulnerable
+# dependencies. Fails only when the registry/OSV positively flags one — abstentions never block the PR.
+name: Drillable Check
+on: pull_request
+
+jobs:
+  drillable-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # required so --diff can see the base ref
+      - uses: drillablehq/drillable-check@v0
+        with:
+          scan-diff: true
+          api-key: ${{ secrets.DRILLABLE_KEY }}
+          # fail-on: corrected    # default. set "corrected,abstained" for a strict gate.

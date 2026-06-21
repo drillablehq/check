@@ -1,0 +1,15 @@
+# Lets any repo add Drillable Check to .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/drillablehq/drillable-check
+#     rev: v0.1.0
+#     hooks:
+#       - id: drillable-check
+#
+# Runs on staged files; fails the commit only on a CORRECTED claim (abstentions pass).
+- id: drillable-check
+  name: Drillable Check (ground factual claims)
+  description: Grades factual claims in changed files against the Drillable corpus; fails only on corrections.
+  entry: npx --yes drillable-check@latest
+  language: node
+  pass_filenames: true
+  require_serial: true

@@ -1,0 +1,36 @@
+name: "Drillable Check"
+description: "Ground the factual claims in your changed files against the Drillable corpus. Fails only on positively-contradicted claims; abstentions never block."
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  scan-diff:
+    description: "Only check files changed vs the base ref (recommended for PRs). If false, use `paths`."
+    required: false
+    default: "true"
+  paths:
+    description: "Files/globs to check when scan-diff is false."
+    required: false
+    default: ""
+  fail-on:
+    description: "Comma list of verdicts that fail the build. Default: corrected (abstentions never fail)."
+    required: false
+    default: "corrected"
+  api-key:
+    description: "Drillable API key — pass ${{ secrets.DRILLABLE_KEY }}."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        DRILLABLE_KEY: ${{ inputs.api-key }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+      run: |
+        if [ "${{ inputs.scan-diff }}" = "true" ]; then
+          npx --yes drillable-check@latest --diff --fail-on "${{ inputs.fail-on }}"
+        else
+          npx --yes drillable-check@latest ${{ inputs.paths }} --fail-on "${{ inputs.fail-on }}"
+        fi
