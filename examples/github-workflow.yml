@@ -14,5 +14,5 @@ jobs:
       - uses: drillablehq/drillable-check@v0
         with:
           scan-diff: true
-          api-key: ${{ secrets.DRILLABLE_KEY }}
-          # fail-on: corrected    # default. set "corrected,abstained" for a strict gate.
+          # api-key: ${{ secrets.DRILLABLE_KEY }}   # optional — the service needs no auth today
+          # fail-on: corrected                       # default. set "corrected,abstained" for a strict gate.
