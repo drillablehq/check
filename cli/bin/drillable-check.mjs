@@ -11,7 +11,7 @@
 //   npx drillable-check --diff            # check only manifests changed vs the base ref (CI default)
 //   npx drillable-check --json            # machine output
 //
-// Grades npm (package.json, package-lock.json), PyPI (requirements.txt, pyproject.toml), and crates
+// Grades npm (package.json, package-lock.json, yarn.lock, pnpm-lock.yaml), PyPI (requirements.txt, pyproject.toml), and crates
 // (Cargo.toml) today; other ecosystems abstain (never a false denial). Prose / factual-claim grading
 // is roadmap, not shipped — see README.
 //
@@ -65,7 +65,7 @@ Options:
   --fail-on-error      treat an unreachable engine as a failure (exit 2) instead of passing
   -h, --help           show this help and exit
 
-Graded today: npm (package.json, package-lock.json) · PyPI (requirements.txt, pyproject.toml) ·
+Graded today: npm (package.json, package-lock.json, yarn.lock, pnpm-lock.yaml) · PyPI (requirements.txt, pyproject.toml) ·
 crates (Cargo.toml). Other ecosystems abstain — never a false denial.
 
 Exit codes:
@@ -79,9 +79,9 @@ const KEY = process.env.DRILLABLE_KEY ?? "";
 const FAIL_ON = opt.failOn.split(",").map((s) => s.trim());
 
 // Dependency manifests the engine grades today (verified live against /check) — keep in sync with
-// what /check actually accepts: npm (package.json, package-lock.json), PyPI (requirements.txt,
+// what /check actually accepts: npm (package.json, package-lock.json, yarn.lock, pnpm-lock.yaml), PyPI (requirements.txt,
 // pyproject.toml), crates (Cargo.toml). Other ecosystems abstain server-side, never a false denial.
-const MANIFESTS = ["package.json", "package-lock.json", "requirements.txt", "pyproject.toml", "Cargo.toml"];
+const MANIFESTS = ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "requirements.txt", "pyproject.toml", "Cargo.toml"];
 const isManifest = (p) => MANIFESTS.includes(basename(p));
 const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
 const discover = (dir) => MANIFESTS.map((m) => join(dir, m)).filter(existsSync); // shallow, CWD only
