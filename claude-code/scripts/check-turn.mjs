@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 // drillable-check — the Stop hook ("the rail").
 //
+// STATUS — PARKED SEED, not active today. This hook grades the agent's PROSE turn output, which is
+// the roadmap claim lane (see ../../README.md "claims beyond dependencies" and
+// ../../docs/check-endpoint.md). The live /check is LOCKFILE-ONLY and 400s on a prose `{text}` body,
+// so against today's engine this hook just fails open (quiet exit, never blocks); it comes alive when
+// the prose lane ships. The shipped product today is the dependency CLI (../../cli) — a Stop-hook
+// can't grade chat text against a lockfile, so this stays parked rather than being repurposed.
+//
 // Fires when the agent finishes a turn. Ships the turn's text to Drillable Check; if anything
 // comes back CORRECTED, blocks the stop so the agent revises BEFORE the user sees the wrong claim.
 // This is the structural answer to the confident-wrong paradox: the harness checks every turn

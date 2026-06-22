@@ -5,11 +5,12 @@
 #     hooks:
 #       - id: drillable-check
 #
-# Runs on staged files; fails the commit only on a CORRECTED claim (abstentions pass).
+# Runs on staged dependency manifests; fails the commit only on a flagged package (abstentions pass).
 - id: drillable-check
-  name: Drillable Check (ground factual claims)
-  description: Grades factual claims in changed files against the Drillable corpus; fails only on corrections.
+  name: Drillable Check (verify dependencies)
+  description: Catches hallucinated/squatted/unpublished/vulnerable deps in changed lockfiles; fails only on a flagged package.
   entry: npx --yes drillable-check@latest
   language: node
+  files: (^|/)(package\.json|package-lock\.json|requirements\.txt)$
   pass_filenames: true
   require_serial: true
