@@ -18,7 +18,7 @@ inputs:
     required: false
     default: "corrected"
   api-key:
-    description: "Drillable API key — optional today (the service needs no auth yet; reserved for future per-key limits). Pass ${{ secrets.DRILLABLE_KEY }} if you have one."
+    description: "Drillable API key — optional today (the service needs no auth yet; reserved for future per-key limits). If you have one, pass it via a repository secret (see the README usage example)."
     required: false
     default: ""
 
