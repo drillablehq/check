@@ -1,0 +1,48 @@
+# Publishes the CLI (cli/ → npm package `drillable-check`) when a GitHub Release is published.
+#
+# Why this exists: the GitHub Action (action.yml) and the pre-commit hook both run
+# `npx --yes drillable-check@latest`, so a merged CLI fix reaches users ONLY after an npm publish.
+# Without this, "merged" != "shipped" (the gap that left the old prose-grader bin live).
+#
+# ONE-TIME SETUP (repo admin): add an automation token as the `NPM_TOKEN` Actions secret
+#   (npmjs.com → Access Tokens → Generate → "Automation"; Settings → Secrets and variables → Actions).
+#
+# TO SHIP: bump cli/package.json's version, merge, then cut a GitHub Release whose tag is `v<version>`
+#   (e.g. v0.1.1). This workflow verifies the tag matches the package version, then publishes with
+#   npm provenance (a signed supply-chain attestation — fitting for a supply-chain tool).
+name: publish-cli
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write          # required for `npm publish --provenance`
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Release tag must match cli/package.json version
+        if: github.event_name == 'release'
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::release tag ${GITHUB_REF_NAME} does not match cli version ${PKG} — bump cli/package.json or retag"
+            exit 1
+          fi
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
