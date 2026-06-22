@@ -1,0 +1,58 @@
+# Load-test the composite action manifest by actually USING it (`uses: ./`).
+#
+# Why this exists: this repo's only other CI is publish-on-release, and the check ENGINE's selftests
+# live in the consuming repo (bootable-spec) — neither ever LOADS action.yml. So a manifest-only bug
+# shipped green once: a `${{ secrets.* }}` expression in an input description, which GitHub evaluates
+# at action-load time and rejects in a composite action (a composite manifest has no `secrets`
+# context). The CLI was fine; the Action could not load at all, and the first consumer to invoke it
+# (bootable-spec #989) ate the failure. `uses: ./` forces GitHub to parse + validate the manifest
+# before any step runs, so that whole class fails HERE, on our own PR, instead of downstream.
+#
+# Both of the action's modes are exercised so a future edit to either branch of action.yml's `run:`
+# is covered. Both are deterministic and network-free: each resolves to "no dependency manifest to
+# check → exit 0" without contacting the engine (and engine-unreachable is exit 0 by design anyway),
+# so this job is green whenever the manifest loads and the action→CLI wiring holds — and red only
+# when one of those breaks. It is a manifest/wiring smoke test, NOT a grader test (the verdict logic
+# is covered by the engine selftests upstream).
+
+name: action-smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # so the scan-diff mode can resolve the base ref
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Mode 1 — scan-diff (the PR default form). This repo commits no lockfile, so the diff holds no
+      # dependency manifest → the CLI no-ops → exit 0.
+      - name: action loads · scan-diff mode
+        uses: ./
+        with:
+          scan-diff: true
+
+      # Mode 2 — explicit paths. A non-manifest path is filtered out ("nothing to check") → exit 0.
+      - name: action loads · paths mode
+        uses: ./
+        with:
+          scan-diff: false
+          paths: README.md
