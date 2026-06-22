@@ -27,7 +27,8 @@ ground truth) and resolves each one live:
 | Ecosystem | Files | What's graded |
 | --- | --- | --- |
 | npm | `package.json`, `package-lock.json` | name exists · version published · known CVEs (OSV) |
-| PyPI | `requirements.txt` | name exists · pinned (`==`) version published · known CVEs |
+| PyPI | `requirements.txt`, `pyproject.toml` | name exists · pinned (`==`) version published · known CVEs |
+| crates | `Cargo.toml` | name exists · version published · known CVEs (RustSec/OSV) |
 
 Each dependency comes back **`verified`** (real, drilled to the registry), **`corrected`** (a denied
 name / unpublished version / known CVE — *the gate*), or **`abstained`** (an ecosystem it doesn't cover

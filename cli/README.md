@@ -19,7 +19,8 @@ npx drillable-check --json            # machine output
 | Ecosystem | Files | Graded |
 | --- | --- | --- |
 | npm | `package.json`, `package-lock.json` | name exists · version published · known CVEs (OSV) |
-| PyPI | `requirements.txt` | name exists · `==`-pinned version published · known CVEs |
+| PyPI | `requirements.txt`, `pyproject.toml` | name exists · `==`-pinned version published · known CVEs |
+| crates | `Cargo.toml` | name exists · version published · known CVEs (RustSec/OSV) |
 
 Each dependency returns **`verified`**, **`corrected`** (denied name / unpublished version / known CVE —
 *the gate*), or **`abstained`** (uncovered ecosystem or unreachable registry — never a false denial).
