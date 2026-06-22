@@ -1,17 +1,59 @@
 # `/check` — the Drillable Check engine contract
 
 `/check` is the one server-side endpoint every surface calls (CLI, GitHub Action, the Claude Code
-hook, the web). Give it text; it returns a **receipt** — a per-claim verdict (`verified` /
-`corrected` / `abstained`) with a source and a `file:line`.
+hook, the web). Give it dependency manifests; it returns a **receipt** — a per-package verdict
+(`verified` / `corrected` / `abstained`) with the registry/OSV source and a `file:line`.
+
+> **Status — today vs. this document.** The **live** `/check` grades **dependency manifests only**
+> (`package.json`, `package-lock.json`, `requirements.txt`): it parses the declared dependencies and
+> resolves each against the live registry + OSV. That is the shape in [What ships today](#what-ships-today)
+> below. The free-text **extract → route → grade → bridge → locate** pipeline documented in the rest
+> of this file is the **roadmap** for the general-claim lane (see the README's "claims beyond
+> dependencies"); it is **not yet shipped**. Posting `{ "text": "…" }` to the live endpoint today
+> returns `400 files required: package.json / package-lock.json / requirements.txt`. Read the
+> prose-pipeline sections below as a design spec for that future lane, not the current contract.
 
 **Where it lives:** server-side, in the gateway (alongside the existing `verify` machinery). This
-repo only *calls* it. **What exists today:** `verify` (single + receipt, recognition-free + catalog)
-and `search`. **What `/check` adds:** claim **extraction** over free text, claim **location**, and
-the **`verify`→`search` bridge**.
+repo only *calls* it. **What exists today:** lockfile dependency grading (registry + OSV), plus the
+`verify` (single + receipt, recognition-free + catalog) and `search` cores. **What the roadmap
+`/check` adds:** claim **extraction** over free text, claim **location**, and the **`verify`→`search`
+bridge**.
 
 ---
 
-## The pipeline
+## What ships today
+
+The live endpoint takes `files[]` of dependency manifests and returns one result per declared
+package — no extraction, no prose, because a lockfile is already ground truth.
+
+```jsonc
+// request
+{
+  "mode": "receipt",
+  "files": [ { "path": "package.json", "content": "{\"dependencies\":{\"react\":\"18.2.0\"}}" } ]
+}
+```
+```jsonc
+// response — one result per package; `corrected` is the gate
+{
+  "results": [
+    { "path": "package.json", "line": 1, "was": "npm:react", "verdict": "verified",
+      "value": "react — published", "source": "https://registry.npmjs.org/react", "kind": null },
+    { "path": "package.json", "line": 1, "was": "npm:superfast-quux-xyzzy-9000", "verdict": "corrected",
+      "value": "registry returned 404 — no such package",
+      "source": "https://registry.npmjs.org/superfast-quux-xyzzy-9000", "kind": "hallucinated-name" }
+  ],
+  "summary": { "verified": 1, "corrected": 1, "abstained": 0 },
+  "checked": 2, "deps": 2, "notes": []
+}
+```
+
+`kind` types the correction (`hallucinated-name`, typo-squat, unpublished-version, CVE, …). Clients
+gate on `corrected` (the CLI exits 1); `abstained` (surfaced as "no record") never fails the build.
+
+---
+
+## The roadmap pipeline
 
 ```
 text ─▶ 1 EXTRACT ─▶ 2 ROUTE ─▶ 3 GRADE ─▶ 4 BRIDGE ─▶ 5 LOCATE+ASSEMBLE ─▶ receipt
@@ -58,7 +100,10 @@ is what stops the bridge from reintroducing fuzzy-retrieval-as-truth.
 
 ---
 
-## Request
+## Request (roadmap shape)
+
+> The `text`, `domains`, and `scope` fields below belong to the roadmap prose lane. Today only
+> `mode` + `files[]` (manifests) are honored — see [What ships today](#what-ships-today).
 
 ```
 POST /check
@@ -80,7 +125,10 @@ Content-Type: application/json
 }
 ```
 
-## Response
+## Response (roadmap shape)
+
+> The prose receipt below (extraction `span`/`claim_text`, the `bridge` `via`, `recovered_by_bridge`)
+> is the roadmap lane. For the shape the endpoint returns today, see [What ships today](#what-ships-today).
 
 Builds directly on the existing `verify` receipt — same `results[]` shape, plus `path`/`line`/
 `span`/`claim_text` and richer `summary`.

@@ -1,5 +1,11 @@
 # The `verify`→`search` bridge — implementation spec
 
+> **Status — roadmap, not shipped.** The bridge belongs to the general-claim lane (see the README's
+> "claims beyond dependencies" and [`check-endpoint.md`](./check-endpoint.md)). The live Drillable
+> Check grades **dependency manifests only** — registry/OSV lookups, which never abstain-then-bridge —
+> so nothing described here is on the live path yet. This is the design spec for when Check widens
+> beyond lockfiles.
+
 The bridge recovers a verdict for a claim that `verify` **abstained** on, by finding the record the
 claim is about and running an **executable value-comparison** against it. It is the single unlock
 that widens Check from the executable lane to the catalog lane.

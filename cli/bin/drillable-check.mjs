@@ -1,23 +1,30 @@
 #!/usr/bin/env node
-// drillable-check — grounds the factual claims in your files against the Drillable corpus.
-// "npm audit for claims." THIN CLIENT: it ships text to the Drillable Check engine, which does the
-// hard part (claim extraction → verify → the verify→search fallback → locate each claim to file:line)
-// and returns a per-claim receipt. Improvements ship server-side; this client never needs updating.
+// drillable-check — catch the dependencies that don't exist. "the half npm audit can't do."
+// Reads the lockfiles you already commit and grades every package against the LIVE registry +
+// advisory DB (OSV): a hallucinated name, a slop/typo-squat, an unpublished version, or a known CVE
+// fails the build before it ships. THIN CLIENT: it ships your manifests to the Drillable Check engine,
+// which resolves each package live and returns a per-package receipt — each verdict drilling to the
+// registry/OSV URL that decided it (nothing guessed). Improvements ship server-side; never updates.
 //
-//   npx drillable-check docs/**/*.md      # audit specific files
-//   npx drillable-check --diff            # audit only files changed vs the base ref (CI default)
+//   npx drillable-check                   # check this repo's manifests (auto-discovered in CWD)
+//   npx drillable-check package.json      # check a specific manifest
+//   npx drillable-check --diff            # check only manifests changed vs the base ref (CI default)
 //   npx drillable-check --json            # machine output
 //
+// Grades npm (package.json, package-lock.json) + PyPI (requirements.txt) today; other ecosystems
+// abstain (never a false denial). Prose / factual-claim grading is roadmap, not shipped — see README.
+//
 // THE GATE (exit codes):
-//   0  clean — no CORRECTED claims.
-//   1  at least one CORRECTED claim — a fact the corpus positively contradicts. THIS is the gate.
-//   ABSTENTIONS NEVER FAIL THE BUILD: the corpus not holding a referee for a claim is not a defect
+//   0  clean — nothing CORRECTED.
+//   1  at least one CORRECTED package — a name/version the registry or OSV positively flags. THE gate.
+//   ABSTENTIONS NEVER FAIL THE BUILD: an uncovered ecosystem or unreachable registry is not a defect
 //   (it's logged as demand). Fail-only-on-corrected = near-zero-false-positive gating, which is the
 //   whole reason this is safe to put in CI.
 //   Infra/auth error → exit 0 + warning by default (a Drillable outage must not wedge your CI).
 //   Pass --fail-on-error to make an unreachable engine fail instead.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
 import { execSync } from "node:child_process";
 
 const argv = process.argv.slice(2);
@@ -40,8 +47,18 @@ const ENDPOINT = process.env.DRILLABLE_CHECK_URL ?? "https://mcp.drillable.com/c
 const KEY = process.env.DRILLABLE_KEY ?? "";
 const FAIL_ON = opt.failOn.split(",").map((s) => s.trim());
 
-// 1) collect target files (changed-vs-base in --diff mode; else the given paths)
-let files = opt.paths;
+// Dependency manifests the engine grades today (npm + PyPI). pyproject.toml / Cargo.toml join this
+// list once the engine adds those ecosystems — keep it in sync with what /check actually accepts.
+const MANIFESTS = ["package.json", "package-lock.json", "requirements.txt"];
+const isManifest = (p) => MANIFESTS.includes(basename(p));
+const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
+const discover = (dir) => MANIFESTS.map((m) => join(dir, m)).filter(existsSync); // shallow, CWD only
+
+// 1) collect target manifests:
+//    --diff      → manifests changed vs the base ref (the CI default)
+//    paths given → those paths, each directory (e.g. `.`) expanded to the manifests inside it
+//    neither     → auto-discover manifests in the CWD (the headline `npx drillable-check`)
+let files;
 if (opt.diff) {
   try {
     files = execSync(`git diff --name-only ${opt.base}...HEAD`, { encoding: "utf8" })
@@ -50,19 +67,35 @@ if (opt.diff) {
     console.error(`drillable-check: could not diff against ${opt.base} (in CI, checkout with fetch-depth: 0).`);
     process.exit(opt.failOnError ? 2 : 0);
   }
+} else if (opt.paths.length) {
+  files = opt.paths.flatMap((p) => (isDir(p) ? discover(p) : [p]));
+} else {
+  files = discover(".");
 }
-if (!files.length) { console.error("drillable-check: no files to check (pass paths or --diff)."); process.exit(0); }
 
-// 2) call the engine — it extracts claims, grades them, and returns receipts with file:line
+// The engine only grades dependency manifests, so drop everything else here. This makes a docs-only
+// run (or `drillable-check README.md`) a clean no-op instead of a confusing engine error.
+files = files.filter(isManifest);
+if (!files.length) {
+  console.error("drillable-check: no package.json / package-lock.json / requirements.txt found here — nothing to check.");
+  process.exit(0);
+}
+
+// 2) read each manifest; if nothing is actually readable, that's a no-op, not an engine error
+//    (an empty files[] is what the endpoint 400s on — short-circuit so we never mislabel it).
+const payload = files.map((p) => ({ path: p, content: read(p) })).filter((f) => f.content != null);
+if (!payload.length) {
+  console.error("drillable-check: nothing to check (could not read any manifest).");
+  process.exit(0);
+}
+
+// 3) call the engine — it parses the declared dependencies, resolves each live, and returns receipts
 let receipt;
 try {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json", ...(KEY ? { authorization: `Bearer ${KEY}` } : {}) },
-    body: JSON.stringify({
-      mode: "receipt",
-      files: files.map((p) => ({ path: p, content: read(p) })).filter((f) => f.content != null),
-    }),
+    body: JSON.stringify({ mode: "receipt", files: payload }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   receipt = await res.json();
@@ -75,18 +108,21 @@ const results = receipt?.results ?? [];
 const pick = (v) => results.filter((r) => r.verdict === v);
 const corrected = pick("corrected"), verified = pick("verified"), abstained = pick("abstained");
 
-// 3) render
+// 4) render. Verdicts on the wire are verified | corrected | abstained; we surface "abstained" as
+//    "no record" to match the label on drillable.com (the JSON keeps the raw verdict for tooling).
 if (opt.json) {
   console.log(JSON.stringify({ summary: { verified: verified.length, corrected: corrected.length, abstained: abstained.length }, results }, null, 2));
 } else {
   for (const c of corrected) {
-    console.log(`✗ ${c.path}:${c.line ?? "?"}  "${c.was ?? c.asserted}" → ${c.value}  (${c.source ?? c.independence ?? "drillable"})`);
+    const where = c.line != null ? `${c.path}:${c.line}` : c.path;
+    const kind = c.kind ? ` [${c.kind}]` : "";
+    console.log(`✗ ${where}  ${c.was ?? c.asserted ?? "?"}${kind} → ${c.value ?? "flagged"}  (${c.source ?? c.independence ?? "drillable"})`);
   }
-  console.log(`\n${files.length} file(s) · ${results.length} claim(s) · ${verified.length} verified · ${corrected.length} corrected · ${abstained.length} abstained`);
-  if (abstained.length) console.log(`note: ${abstained.length} abstained = no referee in the corpus (logged as demand, not a failure).`);
+  console.log(`\n${payload.length} file(s) · ${results.length} package(s) · ${verified.length} verified · ${corrected.length} corrected · ${abstained.length} no record`);
+  if (abstained.length) console.log(`note: ${abstained.length} with no record = uncovered ecosystem or registry unreachable (logged as demand, not a failure).`);
 }
 
-// 4) the gate
+// 5) the gate
 process.exit(FAIL_ON.some((v) => pick(v).length > 0) ? 1 : 0);
 
 function read(p) { try { return readFileSync(p, "utf8"); } catch { return null; } }
