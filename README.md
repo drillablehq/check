@@ -49,10 +49,10 @@ Fail-only-on-`corrected` gives **near-zero-false-positive gating** — it can on
 oracle can *prove* (the package literally isn't there). That is what makes it safe to leave on: noisy
 gates get deleted; this one is quiet by construction.
 
-## Why this is separate from Use Drillable
+## Why this is separate from the drillable plugin
 
-[Use Drillable](https://github.com/drillablehq/use-drillable) is a Claude Code *plugin* — one editor,
-one agent. **Check is a service**, and most of its surfaces aren't agents at all:
+[The **drillable** plugin](https://github.com/drillablehq/drillable) is a Claude Code *plugin* — one
+editor, one agent. **Check is a service**, and most of its surfaces aren't agents at all:
 
 | Surface | Form | Status |
 | --- | --- | --- |
